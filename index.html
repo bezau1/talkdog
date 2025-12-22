@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Talk Dog</title>
+
+<style>
+@font-face {
+  font-family: "Determination";
+  src: url("Determination.ttf") format("truetype");
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: black;
+  color: white;
+  font-family: "Determination", monospace;
+  -webkit-font-smoothing: none;
+}
+
+body {
+  display: grid;
+  place-items: center;
+}
+
+img {
+  width: 300px;
+  image-rendering: pixelated;
+  user-select: none;
+}
+
+button {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: black;
+  color: white;
+  border: 2px solid white;
+  padding: 8px 14px;
+  font-family: "Determination", monospace;
+  cursor: pointer;
+}
+
+.hint {
+  position: fixed;
+  bottom: 16px;
+  text-align: center;
+  font-size: 14px;
+  opacity: 0.9;
+}
+</style>
+</head>
+
+<body>
+
+<img id="dog" src="dog.png">
+
+<button id="start">ENABLE MIC</button>
+
+<div class="hint">Speak to make the dog talk</div>
+
+<script>
+const dog = document.getElementById("dog");
+const button = document.getElementById("start");
+
+const idle = "dog.png";
+const talking = "talkdog.png";
+
+let audioCtx, analyser, data;
+let active = false;
+let talkUntil = 0;
+
+const THRESHOLD = 0.06;
+const HOLD = 150;
+
+function update() {
+  if (!active) return;
+
+  analyser.getByteTimeDomainData(data);
+
+  let sum = 0;
+  for (let i = 0; i < data.length; i++) {
+    const v = (data[i] - 128) / 128;
+    sum += v * v;
+  }
+  const volume = Math.sqrt(sum / data.length);
+
+  if (volume > THRESHOLD) {
+    talkUntil = performance.now() + HOLD;
+  }
+
+  dog.src = performance.now() < talkUntil ? talking : idle;
+
+  requestAnimationFrame(update);
+}
+
+button.onclick = async () => {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 2048;
+
+  data = new Uint8Array(analyser.fftSize);
+
+  const source = audioCtx.createMediaStreamSource(stream);
+  source.connect(analyser);
+
+  active = true;
+  button.remove();
+
+  update();
+};
+</script>
+
+</body>
+</html>
